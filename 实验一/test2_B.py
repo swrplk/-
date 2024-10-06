@@ -29,32 +29,21 @@ cv2.imwrite('my_gasuss_noise.jpg', noisy_img)
 
 # 读取带噪声的图像
 img_noise = cv2.imread('my_gasuss_noise.jpg')
-
 # 图像平滑处理
-############均值滤波
+#均值滤波
 img_mean = cv2.blur(img_noise, (5, 5))
-
-###########方框滤波
+#方框滤波
 img_box = cv2.boxFilter(img_noise, -1, (5, 5), normalize=1)
-
-##############高斯滤波
+#高斯滤波
 img_gaussian = cv2.GaussianBlur(img_noise, ksize=(3,3), sigmaX=1.2, sigmaY=0.8)
-
 # 显示图像对比
 titles = ['原始图像', '带噪声图像', '均值滤波', '方框滤波', '高斯滤波']
 images = [img, img_noise, img_mean, img_box, img_gaussian]
-
-# 创建窗口展示图像
 plt.figure(figsize=(10, 8))
-
 for i in range(5):
     plt.subplot(2, 3, i + 1)
     plt.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))  # 转换为RGB显示
     plt.title(titles[i])
     plt.xticks([]), plt.yticks([])
-
 plt.tight_layout()
-
-# 保存图像对比结果
-plt.savefig('image_comparison.png')  # 保存图片，覆盖之前的输出图像
 plt.show()

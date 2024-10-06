@@ -32,7 +32,7 @@ def hua_T_r():  # 定义灰度级切片转换函数
     plt.grid(True)  # 显示网格
     plt.show()  # 展示图像
 
-#位平面切片
+# 位平面切片
 def wei_ping_mian_qie_pian():  # 定义位平面切片函数
     img = cv2.imread('gray_image.png', cv2.IMREAD_GRAYSCALE)  # 读取灰度图像
     bit_planes = []  # 创建一个列表存储8个位平面的图像
@@ -298,3 +298,5 @@ if num == '3':  # 如果选择功能3
 if num == '4':  # 如果选择功能4
     image = 'orange.jpg'  # 设置图像路径
     process_image_and_plot_histogramss(image)  # 执行处理图像并绘制均衡化直方图函数
+else:
+    print("无效输入，请输入1到5之间的数字。")

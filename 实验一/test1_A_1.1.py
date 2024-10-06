@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt  # 导入绘图库
-import cv2  # 导入OpenCV库
-import numpy as np  # 导入NumPy库
+import matplotlib.pyplot as plt  
+import cv2  
+import numpy as np  
 
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 选择字体为SimHei（黑体）
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题

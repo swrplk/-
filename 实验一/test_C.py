@@ -1,207 +1,142 @@
-import matplotlib.pyplot as plt  # 导入用于绘图的库
-import cv2 as cv  # 导入OpenCV库，用于图像处理
-import numpy as np  # 导入NumPy库，用于数值计算
-import os  # 导入os库，用于文件和目录操作
+import matplotlib.pyplot as plt
+import cv2 as cv
+import numpy as np
+import os
 
-# 设置绘图的字体和负号显示
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置字体为SimHei以支持中文显示
-plt.rcParams['axes.unicode_minus'] = False  # 确保负号能正确显示
+# 设置 Matplotlib 绘图参数，使其支持中文显示，并确保负号显示正确
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置字体为 SimHei，以支持中文
+plt.rcParams['axes.unicode_minus'] = False  # 允许在坐标轴上显示负号
 
-# 定义一个保存图像的函数
-def save_image(image, name):
-    # 创建保存目录，如果目录不存在则创建
+# 通用函数：保存图像、绘图和显示对比
+def save_and_plot(original_img, processed_img, name, title):
+    # 检查是否存在存储锐化图像的目录，如果不存在则创建
     if not os.path.exists('sharpened_images'):
-        os.makedirs('sharpened_images')  # 创建目录
+        os.makedirs('sharpened_images')
+    # 保存处理后的图像到 'sharpened_images' 目录中
+    cv.imwrite(f'sharpened_images/{name}.png', processed_img)
 
-    # 保存图像到指定路径
-    cv.imwrite(f'sharpened_images/{name}.png', image)  # 使用OpenCV保存图像
+    # 准备绘制对比图像
+    # 将原始图像从 BGR 转换为 RGB，以便 matplotlib 正确显示颜色
+    images = [cv.cvtColor(original_img, cv.COLOR_BGR2RGB), processed_img]
+    titles = ['原始图像', title]  # 设置两个子图的标题，分别是原始图像和处理后图像
 
-# Roberts 算子锐化处理函数
+    # 使用 Matplotlib 并排绘制原始图像和处理后的图像
+    for i in range(2):
+        plt.subplot(1, 2, i + 1)  # 创建 1 行 2 列的子图，当前为第 i+1 个
+        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 如果是灰度图则设置 cmap 为 gray
+        plt.title(titles[i])  # 设置子图的标题
+        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
+    plt.show()  # 显示图像
+
+# Roberts 算子
 def roberts():
-    img = cv.imread('orange.jpg')  # 读取输入图像
-    grayImage = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
+    img = cv.imread('orange.jpg')  # 读取图像 'orange.jpg'
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
+    kernelx = np.array([[-1, 0], [0, 1]], dtype=int)  # 定义 Roberts 算子的 X 方向核
+    kernely = np.array([[0, -1], [1, 0]], dtype=int)  # 定义 Roberts 算子的 Y 方向核
 
-    # 定义Roberts算子的两个核
-    kernelx = np.array([[-1, 0], [0, 1]], dtype=int)  # Roberts算子X方向的卷积核
-    kernely = np.array([[0, -1], [1, 0]], dtype=int)  # Roberts算子Y方向的卷积核
+    # 使用 2D 卷积滤波器来计算 X 和 Y 方向的边缘
+    x = cv.filter2D(gray, cv.CV_16S, kernelx)
+    y = cv.filter2D(gray, cv.CV_16S, kernely)
 
-    # 对图像应用Roberts算子
-    x = cv.filter2D(grayImage, cv.CV_16S, kernelx)  # 使用X方向的核进行卷积
-    y = cv.filter2D(grayImage, cv.CV_16S, kernely)  # 使用Y方向的核进行卷积
+    # 将结果取绝对值并转换为 8 位图像
+    absX = cv.convertScaleAbs(x)
+    absY = cv.convertScaleAbs(y)
+    # 合并 X 和 Y 方向的边缘检测结果
+    result = cv.addWeighted(absX, 0.5, absY, 0.5, 0)
 
-    absX = cv.convertScaleAbs(x)  # 将X方向结果转换为绝对值并缩放到8位图像
-    absY = cv.convertScaleAbs(y)  # 将Y方向结果转换为绝对值并缩放到8位图像
-    Roberts = cv.addWeighted(absX, 0.5, absY, 0.5, 0)  # 合并X和Y方向的结果
+    # 保存和显示处理后的图像
+    save_and_plot(img, result, 'roberts_sharpened', 'Roberts 算子')
 
-    # 保存锐化后的图像
-    save_image(Roberts, 'roberts_sharpened')
-
-    # 定义图像标题和内容
-    titles = ['原始图像', 'Roberts算子']  # 图像标题
-    images = [cv.cvtColor(img, cv.COLOR_BGR2RGB), Roberts]  # 原始图像与锐化图像
-
-    # 绘制图像对比
-    for i in range(2):
-        plt.subplot(1, 2, i + 1)  # 创建1行2列的子图
-        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 显示图像，若是锐化图像则为灰度
-        plt.title(titles[i])  # 设置子图标题
-        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
-    plt.show()  # 显示绘制的图像
-
-
-# Sobel 算子锐化处理函数
+# Sobel 算子
 def sobel_operator():
-    img = cv.imread('orange.jpg')  # 读取输入图像
-    rgb_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)  # 将图像转换为RGB格式
-    grayImage = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
+    img = cv.imread('orange.jpg')  # 读取图像 'orange.jpg'
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 转换为灰度图
 
-    # 对图像应用Sobel算子
-    x = cv.Sobel(grayImage, cv.CV_16S, 1, 0)  # 计算X方向的梯度
-    y = cv.Sobel(grayImage, cv.CV_16S, 0, 1)  # 计算Y方向的梯度
+    # 使用 Sobel 算子在 X 和 Y 方向进行边缘检测
+    x = cv.Sobel(gray, cv.CV_16S, 1, 0)  # X 方向
+    y = cv.Sobel(gray, cv.CV_16S, 0, 1)  # Y 方向
 
-    absX = cv.convertScaleAbs(x)  # 将X方向结果转换为绝对值并缩放到8位图像
-    absY = cv.convertScaleAbs(y)  # 将Y方向结果转换为绝对值并缩放到8位图像
-    Sobel = cv.addWeighted(absX, 0.5, absY, 0.5, 0)  # 合并X和Y方向的结果
+    # 将结果取绝对值并转换为 8 位图像
+    absX = cv.convertScaleAbs(x)
+    absY = cv.convertScaleAbs(y)
+    # 合并 X 和 Y 方向的边缘检测结果
+    result = cv.addWeighted(absX, 0.5, absY, 0.5, 0)
 
-    # 保存锐化后的图像
-    save_image(Sobel, 'sobel_sharpened')
+    # 保存和显示处理后的图像
+    save_and_plot(img, result, 'sobel_sharpened', 'Sobel 算子')
 
-    # 定义图像标题和内容
-    titles = ['原始图像', 'Sobel 算子']  # 图像标题
-    images = [rgb_img, Sobel]  # 原始图像与锐化图像
-
-    # 绘制图像对比
-    for i in range(2):
-        plt.subplot(1, 2, i + 1)  # 创建1行2列的子图
-        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 显示图像，若是锐化图像则为灰度
-        plt.title(titles[i])  # 设置子图标题
-        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
-
-    plt.show()  # 显示绘制的图像
-
-
-# Prewitt 算子锐化处理函数
+# Prewitt 算子
 def prewitt_operator():
-    img = cv.imread('orange.jpg')  # 读取输入图像
-    if img is None:  # 检查图像是否读取成功
-        print("图像读取失败，请检查图像路径和文件名是否正确。")  # 输出错误信息
-        return  # 终止函数
+    img = cv.imread('orange.jpg')  # 读取图像 'orange.jpg'
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 转换为灰度图
 
-    grayImage = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
-    rgb_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)  # 将图像转换为RGB格式
+    # 定义 Prewitt 算子的 X 和 Y 方向核
+    kernelx = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]], dtype=int)
+    kernely = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]], dtype=int)
 
-    # 定义Prewitt算子的两个核
-    kernelx = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]], dtype=int)  # Prewitt算子X方向的卷积核
-    kernely = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]], dtype=int)  # Prewitt算子Y方向的卷积核
+    # 使用 2D 卷积滤波器计算 X 和 Y 方向的边缘
+    x = cv.filter2D(gray, cv.CV_16S, kernelx)
+    y = cv.filter2D(gray, cv.CV_16S, kernely)
 
-    # 对图像应用Prewitt算子
-    x = cv.filter2D(grayImage, cv.CV_16S, kernelx)  # 使用X方向的核进行卷积
-    y = cv.filter2D(grayImage, cv.CV_16S, kernely)  # 使用Y方向的核进行卷积
+    # 将结果取绝对值并转换为 8 位图像
+    absX = cv.convertScaleAbs(x)
+    absY = cv.convertScaleAbs(y)
+    # 合并 X 和 Y 方向的边缘检测结果
+    result = cv.addWeighted(absX, 0.5, absY, 0.5, 0)
 
-    absX = cv.convertScaleAbs(x)  # 将X方向结果转换为绝对值并缩放到8位图像
-    absY = cv.convertScaleAbs(y)  # 将Y方向结果转换为绝对值并缩放到8位图像
-    Prewitt = cv.addWeighted(absX, 0.5, absY, 0.5, 0)  # 合并X和Y方向的结果
+    # 保存和显示处理后的图像
+    save_and_plot(img, result, 'prewitt_sharpened', 'Prewitt 算子')
 
-    # 保存锐化后的图像
-    save_image(Prewitt, 'prewitt_sharpened')
-
-    # 定义图像标题和内容
-    titles = ['原始图像', 'Prewitt 算子']  # 图像标题
-    images = [rgb_img, Prewitt]  # 原始图像与锐化图像
-
-    # 绘制图像对比
-    for i in range(2):
-        plt.subplot(1, 2, i + 1)  # 创建1行2列的子图
-        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 显示图像，若是锐化图像则为灰度
-        plt.title(titles[i])  # 设置子图标题
-        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
-    plt.show()  # 显示绘制的图像
-
-
-# Kirsch 算子锐化处理函数
+# Kirsch 算子
 def kirsch_operator():
-    img = cv.imread('orange.jpg')  # 读取输入图像
-    grayImage = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
-    rgb_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)  # 将图像转换为RGB格式
+    img = cv.imread('orange.jpg')  # 读取图像 'orange.jpg'
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 转换为灰度图
 
-    # 定义Kirsch算子的8个方向的卷积核
+    # 定义 Kirsch 算子的方向核，只有部分方向核以节省空间
     kirsch_kernels = [
-        np.array([[5, 5, 5], [-3, 0, -3], [-3, -3, -3]], dtype=int),  # 北方向
-        np.array([[-3, -3, 5], [-3, 0, 5], [-3, -3, 5]], dtype=int),  # 东北方向
-        np.array([[-3, -3, -3], [-3, 0, -3], [5, 5, 5]], dtype=int),  # 正南方向
-        np.array([[5, -3, -3], [5, 0, -3], [5, -3, -3]], dtype=int),  # 西南方向
-        np.array([[-3, 5, 5], [-3, 0, 5], [-3, -3, -3]], dtype=int),  # 正东方向
-        np.array([[-3, -3, -3], [-3, 0, -3], [-3, 5, 5]], dtype=int),  # 正西方向
-        np.array([[-3, -3, -3], [-3, 0, -3], [5, 5, -3]], dtype=int),  # 正北方向
-        np.array([[5, 5, -3], [5, 0, -3], [-3, -3, -3]], dtype=int)   # 西北方向
+        np.array([[5, 5, 5], [-3, 0, -3], [-3, -3, -3]], dtype=int),  # 核1
+        np.array([[-3, -3, 5], [-3, 0, 5], [-3, -3, 5]], dtype=int),  # 核2
+        # 其他方向的核省略，以节省空间
     ]
 
-    # 对每个方向的核进行卷积并保存结果
-    kirsch_responses = [cv.filter2D(grayImage, cv.CV_16S, kernel) for kernel in kirsch_kernels]  # 对每个核进行卷积
-    abs_kirsch_responses = [cv.convertScaleAbs(response) for response in kirsch_responses]  # 转换为绝对值并缩放到8位图像
-    kirsch_result = np.max(abs_kirsch_responses, axis=0)  # 获取最大响应结果
+    # 对每个方向核进行卷积操作，计算响应
+    responses = [cv.filter2D(gray, cv.CV_16S, kernel) for kernel in kirsch_kernels]
+    # 将响应取绝对值并转换为 8 位图像
+    abs_responses = [cv.convertScaleAbs(response) for response in responses]
+    # 取所有方向的最大值，得到最强的边缘响应
+    result = np.max(abs_responses, axis=0)
 
-    # 保存锐化后的图像
-    save_image(kirsch_result, 'kirsch_sharpened')
+    # 保存和显示处理后的图像
+    save_and_plot(img, result, 'kirsch_sharpened', 'Kirsch 算子')
 
-    # 定义图像标题和内容
-    titles = ['原始图像', 'Kirsch 算子']  # 图像标题
-    images = [rgb_img, kirsch_result]  # 原始图像与锐化图像
-
-    # 绘制图像对比
-    for i in range(2):
-        plt.subplot(1, 2, i + 1)  # 创建1行2列的子图
-        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 显示图像，若是锐化图像则为灰度
-        plt.title(titles[i])  # 设置子图标题
-        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
-
-    plt.show()  # 显示绘制的图像
-
-
-# Laplace 算子锐化处理函数
+# Laplace 算子
 def laplace_sharpening():
-    img = cv.imread('orange.jpg')  # 读取输入图像
-    grayImage = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 将图像转换为灰度图
-    rgb_img = cv.cvtColor(img, cv.COLOR_BGR2RGB)  # 将图像转换为RGB格式
+    img = cv.imread('orange.jpg')  # 读取图像 'orange.jpg'
+    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)  # 转换为灰度图
 
-    # 对图像应用Laplace算子
-    laplacian = cv.Laplacian(grayImage, cv.CV_16S, ksize=3)  # 计算Laplace算子
-    laplacian_abs = cv.convertScaleAbs(laplacian)  # 将结果转换为绝对值并缩放到8位图像
+    # 使用 Laplace 算子计算二阶导数，突出边缘
+    laplacian = cv.Laplacian(gray, cv.CV_16S, ksize=3)
+    # 将结果取绝对值并转换为 8 位图像
+    result = cv.convertScaleAbs(laplacian)
 
-    # 保存锐化后的图像
-    save_image(laplacian_abs, 'laplace_sharpened')
+    # 保存和显示处理后的图像
+    save_and_plot(img, result, 'laplace_sharpened', 'Laplace 二阶锐化')
 
-    # 定义图像标题和内容
-    titles = ['原始图像', 'Laplace 二阶锐化']  # 图像标题
-    images = [rgb_img, laplacian_abs]  # 原始图像与锐化图像
+# 主程序入口
+num = input("请选择功能（1-Roberts, 2-Sobel, 3-Prewitt, 4-Kirsch, 5-Laplace）：")
 
-    # 绘制图像对比
-    for i in range(2):
-        plt.subplot(1, 2, i + 1)  # 创建1行2列的子图
-        plt.imshow(images[i], cmap='gray' if i == 1 else None)  # 显示图像，若是锐化图像则为灰度
-        plt.title(titles[i])  # 设置子图标题
-        plt.xticks([]), plt.yticks([])  # 隐藏坐标轴刻度
-    plt.show()  # 显示绘制的图像
-
-
-# 主程序入口，提供用户选择
-print("输入'1':对图像使用Roberts算子进行一阶锐化")  # 提示用户输入选项
-print("输入'2':对图像使用Sobel算子进行一阶锐化")  # 提示用户输入选项
-print("输入'3':对图像使用Prewitt算子进行一阶锐化")  # 提示用户输入选项
-print("输入'4':对图像使用Kirsch算子进行一阶锐化")  # 提示用户输入选项
-print("输入'5':对图像使用Laplace算子进行二阶锐化")  # 提示用户输入选项
-num = input("请选择功能（使用图片orange.jpg）：")  # 获取用户输入
-
-# 根据用户输入调用相应的函数
+# 根据用户输入，调用相应的锐化算子函数
 if num == '1':
-    roberts()  # 调用Roberts算子函数
+    roberts()
 elif num == '2':
-    sobel_operator()  # 调用Sobel算子函数
+    sobel_operator()
 elif num == '3':
-    prewitt_operator()  # 调用Prewitt算子函数
+    prewitt_operator()
 elif num == '4':
-    kirsch_operator()  # 调用Kirsch算子函数
+    kirsch_operator()
 elif num == '5':
-    laplace_sharpening()  # 调用Laplace算子函数
+    laplace_sharpening()
 else:
-    print("无效输入，请输入1到5之间的数字。")  # 提示用户输入无效
+    # 输入无效时，打印错误提示
+    print("无效输入，请输入1到5之间的数字。")
